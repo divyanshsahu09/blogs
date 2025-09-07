@@ -26,7 +26,10 @@ export const register = [
         ...req.body,
         password: hash,
       });
+
+      console.log('Saving user:', req.body.username);
       await newUser.save();
+      console.log('User saved successfully:', newUser);
       res.status(201).json({ message: "User has been created." });
     } catch (err) {
       next(err);

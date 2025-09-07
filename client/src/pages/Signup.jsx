@@ -34,29 +34,60 @@ const Signup = () => {
     resolver: yupResolver(schema),
   });
 
+  // const onSubmit = async (data) => {
+  //   setLoading(true);
+  //   try {
+  //     // Simulate API call
+  //     await new Promise(resolve => setTimeout(resolve, 2000));
+      
+  //     // Mock signup - in real app, this would be an API call
+  //     const userData = {
+  //       id: Math.floor(Math.random() * 1000),
+  //       name: data.name,
+  //       email: data.email,
+  //       avatar: `https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=1`,
+  //       username: data.name.toLowerCase().replace(/\s+/g, '')
+  //     };
+      
+  //     login(userData, 'mock-jwt-token');
+  //     navigate('/');
+  //   } catch (error) {
+  //     setError('email', { message: 'Email already exists' });
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
   const onSubmit = async (data) => {
-    setLoading(true);
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Mock signup - in real app, this would be an API call
-      const userData = {
-        id: Math.floor(Math.random() * 1000),
-        name: data.name,
+  setLoading(true);
+  try {
+    const response = await fetch('http://localhost:5000/api/auth/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        username: data.name.toLowerCase().replace(/\s+/g, ''),
         email: data.email,
-        avatar: `https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=1`,
-        username: data.name.toLowerCase().replace(/\s+/g, '')
-      };
-      
-      login(userData, 'mock-jwt-token');
-      navigate('/');
-    } catch (error) {
-      setError('email', { message: 'Email already exists' });
-    } finally {
-      setLoading(false);
+        password: data.password
+      })
+    });
+
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.message || 'Registration failed');
     }
-  };
+
+    // If registration is successful, you might want to log them in directly
+    // or redirect to login page
+    navigate('/login');
+  } catch (error) {
+    setError('email', { message: error.message || 'Registration failed' });
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4 py-12">
