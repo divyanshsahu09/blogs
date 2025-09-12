@@ -1,28 +1,47 @@
+// Cloudinary configuration
+const CLOUD_NAME = 'dnqb6ehel';
+const UPLOAD_PRESET = 'blog_unsigned';
+
 // Cloudinary upload utility
 export const uploadToCloudinary = async (file) => {
+  const cloudName = CLOUD_NAME;
+  const uploadPreset = UPLOAD_PRESET;
+  
+  if (!cloudName || !uploadPreset) {
+    console.error('Cloudinary configuration is missing. Please set up your environment variables.');
+    return {
+      success: false,
+      error: 'Cloudinary is not properly configured.'
+    };
+  }
+
   try {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('upload_preset', 'blog_uploads'); // Replace with your Cloudinary preset
-    formData.append('cloud_name', 'your_cloud_name'); // Replace with your Cloudinary cloud name
+    formData.append('upload_preset', uploadPreset);
+    formData.append('cloud_name', cloudName);
 
+    console.log('Uploading to Cloudinary with config:', { cloudName, uploadPreset });
+    
     const response = await fetch(
-      'https://api.cloudinary.com/v1_1/your_cloud_name/image/upload', // Replace with your cloud name
+      `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
       {
         method: 'POST',
         body: formData,
       }
     );
 
+    const responseData = await response.json();
+    console.log('Cloudinary response:', responseData);
+
     if (!response.ok) {
-      throw new Error('Upload failed');
+      throw new Error(`Upload failed: ${responseData.error?.message || response.statusText}`);
     }
 
-    const data = await response.json();
     return {
       success: true,
-      url: data.secure_url,
-      public_id: data.public_id,
+      url: responseData.secure_url,
+      public_id: responseData.public_id,
     };
   } catch (error) {
     console.error('Cloudinary upload error:', error);

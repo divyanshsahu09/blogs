@@ -27,9 +27,7 @@ export const register = [
         password: hash,
       });
 
-      console.log('Saving user:', req.body.username);
       await newUser.save();
-      console.log('User saved successfully:', newUser);
       res.status(201).json({ message: "User has been created." });
     } catch (err) {
       next(err);
@@ -37,8 +35,9 @@ export const register = [
   },
 ];
 
+// ✅ Updated login: now uses email instead of username
 export const login = [
-  body("username").notEmpty().withMessage("Username is required."),
+  body("email").notEmpty().withMessage("Email is required.").isEmail().withMessage("Invalid email format."),
   body("password").notEmpty().withMessage("Password is required."),
   async (req, res, next) => {
     const errors = validationResult(req);
@@ -47,11 +46,12 @@ export const login = [
     }
 
     try {
-      const user = await User.findOne({ username: req.body.username });
+      // 🔑 Find by email, not username
+      const user = await User.findOne({ email: req.body.email });
       if (!user) return next(createError(404, "User not found!"));
 
       const isCorrect = bcrypt.compareSync(req.body.password, user.password);
-      if (!isCorrect) return next(createError(400, "Wrong password or username!"));
+      if (!isCorrect) return next(createError(400, "Wrong email or password!"));
 
       const token = jwt.sign(
         { id: user._id },

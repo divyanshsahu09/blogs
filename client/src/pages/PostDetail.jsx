@@ -13,15 +13,26 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { usePosts } from '../hooks/usePosts';
+import { getPost } from '../utils/api';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
 
 const PostDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
-  const { posts, toggleLike, deletePost } = usePosts();
-  const [post, setPost] = useState(null);
+  const { likePost, unlikePost, deletePost } = usePosts();
+  const [post, setPost] = useState({
+    title: '',
+    content: '',
+    author: {},
+    coverImage: '',
+    tags: [],
+    likes: [],
+    createdAt: new Date(),
+    readTime: 0
+  });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [showMenu, setShowMenu] = useState(false);
   const [comment, setComment] = useState('');
   const [comments] = useState([
@@ -50,13 +61,35 @@ const PostDetail = () => {
   ]);
 
   useEffect(() => {
-    // Find post by ID
-    const foundPost = posts.find(p => p.id === parseInt(id));
-    if (foundPost) {
-      setPost(foundPost);
+    const fetchPost = async () => {
+      try {
+        setLoading(true);
+        const data = await getPost(id);
+        // Ensure all required properties exist with default values
+        setPost({
+          title: data.title || '',
+          content: data.content || '',
+          author: data.author || {},
+          coverImage: data.coverImage || '',
+          tags: data.tags || [],
+          likes: data.likes || [],
+          createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
+          readTime: data.readTime || 0,
+          ...data // Include any additional properties from the server
+        });
+        setError(null);
+      } catch (error) {
+        console.error('Error fetching post:', error);
+        setError('Failed to load the post. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchPost();
     }
-    setLoading(false);
-  }, [id, posts]);
+  }, [id]);
 
   const formatDate = (date) => {
     const now = new Date();
@@ -71,29 +104,87 @@ const PostDetail = () => {
     return `${Math.ceil(diffDays / 365)} years ago`;
   };
 
-  const handleLike = () => {
-    if (!isAuthenticated) return;
-    toggleLike(post.id);
-    setPost(prev => ({
-      ...prev,
-      liked: !prev.liked,
-      likes: prev.liked ? prev.likes - 1 : prev.likes + 1
-    }));
-  };
+  const handleLike = async () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
 
-  const handleDelete = () => {
-    if (window.confirm('Are you sure you want to delete this post?')) {
-      deletePost(post.id);
-      navigate('/');
+    try {
+      if (post.likes.includes(user?._id)) {
+        await unlikePost(post._id);
+      } else {
+        await likePost(post._id);
+      }
+      
+      // Refresh the post data
+      const response = await fetch(`http://localhost:5000/api/posts/single/${id}`);
+      if (!response.ok) {
+        throw new Error('Failed to refresh post data');
+      }
+      const updatedPost = await response.json();
+      setPost(updatedPost);
+    } catch (error) {
+      console.error('Error updating like:', error);
     }
   };
 
+  const handleDelete = async () => {
+    if (!isAuthenticated || user?._id !== post.author._id) {
+      return;
+    }
+
+    if (window.confirm('Are you sure you want to delete this post?')) {
+      try {
+        const deleted = await deletePost(post._id);
+        if (deleted) {
+          navigate('/');
+        }
+      } catch (error) {
+        console.error('Error deleting post:', error);
+      }
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-white mb-4">Error</h1>
+          <p className="text-gray-400">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!post) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-white mb-4">Post Not Found</h1>
+          <p className="text-gray-400">The post you're looking for doesn't exist.</p>
+          <Link to="/" className="text-blue-500 hover:text-blue-400 mt-4 inline-block">
+            Return to Home
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   const handleShare = async () => {
-    if (navigator.share) {
+    if (navigator.share && post && post.title && post.content) {
       try {
         await navigator.share({
-          title: post.title,
-          text: post.excerpt,
+          title: post.title || 'Blog Post',
+          text: post.content ? post.content.substring(0, 100) + '...' : '',
           url: window.location.href,
         });
       } catch (error) {
@@ -243,16 +334,18 @@ const PostDetail = () => {
           )}
 
           {/* Tags */}
-          <div className="flex flex-wrap gap-2 mb-8">
-            {post.tags.map((tag, index) => (
-              <span
-                key={index}
-                className="px-3 py-1 bg-primary-900/20 text-primary-400 text-sm rounded-full border border-primary-800/30 hover:bg-primary-900/30 transition-colors duration-200 cursor-pointer"
-              >
-                #{tag}
-              </span>
-            ))}
-          </div>
+          {post.tags && post.tags.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-8">
+              {post.tags.map((tag, index) => (
+                <span
+                  key={index}
+                  className="px-3 py-1 bg-primary-900/20 text-primary-400 text-sm rounded-full border border-primary-800/30 hover:bg-primary-900/30 transition-colors duration-200 cursor-pointer"
+                >
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          )}
 
           {/* Content */}
           <div className="prose prose-invert prose-lg max-w-none mb-12">

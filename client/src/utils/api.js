@@ -44,11 +44,13 @@ export const loginUser = async (credentials) => {
     Cookies.set('accessToken', token, { sameSite: 'lax' });
     window.dispatchEvent(new Event('authChange'));
   }
+  console.log("login data",response.data);
   return response.data;
 };
 
 export const getCurrentUser = async () => {
   const response = await api.get('/api/auth/me');
+  console.log("current user data",response.data);
   return response.data;
 };
 
@@ -60,6 +62,7 @@ export const logoutUser = async () => {
 
 // Posts endpoints
 export const createPost = async (postData) => {
+  // If imageUrl exists in postData, it will be included in the request
   const response = await api.post('/api/posts', postData);
   return response.data;
 };
@@ -86,5 +89,15 @@ export const getPosts = async () => {
 
 export const getUserPosts = async () => {
   const response = await api.get('/api/posts/user');
+  return response.data;
+};
+
+export const likePost = async (postId) => {
+  const response = await api.put(`/api/posts/${postId}/like`);
+  return response.data;
+};
+
+export const unlikePost = async (postId) => {
+  const response = await api.put(`/api/posts/${postId}/unlike`);
   return response.data;
 };

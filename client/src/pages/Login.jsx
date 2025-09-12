@@ -31,19 +31,25 @@ const Login = () => {
   const onSubmit = async (data) => {
     setLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Mock login - in real app, this would be an API call
-      const userData = {
-        id: 1,
-        name: 'John Doe',
-        email: data.email,
-        avatar: 'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=1',
-        username: 'johndoe'
-      };
-      
-      login(userData, 'mock-jwt-token');
+      const response = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: data.email,
+          password: data.password
+        }),
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Login failed');
+      }
+
+      const userData = await response.json();
+      login(userData, userData.token);
       navigate('/');
     } catch (error) {
       setError('email', { message: 'Invalid email or password' });

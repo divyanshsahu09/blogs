@@ -6,19 +6,33 @@ import { useAuth } from '../../context/AuthContext';
 import { usePosts } from '../../hooks/usePosts';
 
 const PostCard = ({ post, onDelete }) => {
-  const [isLiked, setIsLiked] = useState(post.liked);
-  const [likes, setLikes] = useState(post.likes);
-  const [showMenu, setShowMenu] = useState(false);
   const { user, isAuthenticated } = useAuth();
-  const { toggleLike } = usePosts();
+  const { toggleLike, likePost, unlikePost } = usePosts();
+  
+  const [isLiked, setIsLiked] = useState(() => {
+    // Ensure post.likes is an array and check if user has liked
+    const likes = Array.isArray(post.likes) ? post.likes : [];
+    return user ? likes.includes(user._id) : false;
+  });
+  const [likesCount, setLikesCount] = useState(post.likesCount || 0);
+  const [showMenu, setShowMenu] = useState(false);
 
-  const handleLike = (e) => {
+  const handleLike = async (e) => {
     e.preventDefault();
     if (!isAuthenticated) return;
     
-    setIsLiked(!isLiked);
-    setLikes(isLiked ? likes - 1 : likes + 1);
-    toggleLike(post.id);
+    try {
+      if (isLiked) {
+        await unlikePost(post._id);
+        setLikesCount(prev => prev - 1);
+      } else {
+        await likePost(post._id);
+        setLikesCount(prev => prev + 1);
+      }
+      setIsLiked(!isLiked);
+    } catch (err) {
+      console.error('Failed to toggle like:', err);
+    }
   };
 
   const handleDelete = (e) => {
@@ -42,7 +56,7 @@ const PostCard = ({ post, onDelete }) => {
     return `${Math.ceil(diffDays / 365)} years ago`;
   };
 
-  const isOwner = isAuthenticated && user?.id === post.author.id;
+  const isOwner = isAuthenticated && user?._id === post.author?._id;
 
   return (
     <motion.article
@@ -53,15 +67,21 @@ const PostCard = ({ post, onDelete }) => {
     >
       <Link to={`/post/${post.id}`}>
         {/* Cover Image */}
-        {post.coverImage && (
-          <div className="aspect-video overflow-hidden">
-            <img
-              src={post.coverImage}
-              alt={post.title}
-              className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-            />
-          </div>
-        )}
+      {post.coverImage && (
+        <div className="aspect-video overflow-hidden">
+          <img
+            src={post.coverImage}
+            alt={post.title}
+            onError={(e) => {
+              // Fallback to a default image if the image fails to load
+              e.target.onerror = null;
+              e.target.src = 'https://via.placeholder.com/800x450?text=Image+Not+Available';
+            }}
+            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+          />
+        </div>
+      )}
+
 
         {/* Content */}
         <div className="p-6">
@@ -69,13 +89,13 @@ const PostCard = ({ post, onDelete }) => {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-3">
               <img
-                src={post.author.avatar}
-                alt={post.author.name}
+                src={post.author?.avatar || `https://ui-avatars.com/api/?name=${post.author?.username || 'User'}&background=random`}
+                alt={post.author?.username || 'User'}
                 className="w-10 h-10 rounded-full object-cover"
               />
               <div>
-                <p className="text-sm font-medium text-white">{post.author.name}</p>
-                <p className="text-xs text-gray-400">@{post.author.username}</p>
+                <p className="text-sm font-medium text-white">{post.author?.username || 'Anonymous'}</p>
+                <p className="text-xs text-gray-400">{formatDate(post.createdAt)}</p>
               </div>
             </div>
 
@@ -158,7 +178,7 @@ const PostCard = ({ post, onDelete }) => {
               } ${!isAuthenticated && 'cursor-not-allowed opacity-50'}`}
             >
               <Heart size={16} fill={isLiked ? 'currentColor' : 'none'} />
-              <span className="text-sm font-medium">{likes}</span>
+              <span className="text-sm font-medium">{likesCount}</span>
             </button>
 
             <Link

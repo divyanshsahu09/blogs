@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { usePosts } from '../hooks/usePosts';
-import { mockUploadToCloudinary } from '../utils/cloudinary';
+import { uploadToCloudinary } from '../utils/cloudinary';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
 import Modal from '../components/UI/Modal';
 
@@ -50,6 +50,7 @@ const CreatePost = () => {
     formState: { errors },
     setValue,
     getValues,
+    reset
   } = useForm({
     resolver: yupResolver(schema),
   });
@@ -61,13 +62,30 @@ const CreatePost = () => {
     if (!file) return;
     
     setUploading(true);
+    console.log('Starting image upload to Cloudinary...', file.name);
+    
     try {
-      const result = await mockUploadToCloudinary(file);
+      // Validate file type and size
+      if (!file.type.startsWith('image/')) {
+        throw new Error('Please upload an image file');
+      }
+      
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        throw new Error('Image size should be less than 5MB');
+      }
+
+      const result = await uploadToCloudinary(file);
+      
       if (result.success) {
+        console.log('Image uploaded successfully to Cloudinary:', result.url);
         setCoverImage(result.url);
+      } else {
+        throw new Error(result.error || 'Failed to upload image');
       }
     } catch (error) {
       console.error('Upload failed:', error);
+      alert(error.message || 'An error occurred while uploading the image');
+      setCoverImage(''); // Clear any previous image
     } finally {
       setUploading(false);
     }
@@ -145,29 +163,102 @@ const CreatePost = () => {
   const onSubmit = async (data) => {
     setSaving(true);
     try {
+      if (!coverImage) {
+        throw new Error('Please add a cover image for your post');
+      }
+
+      // Create the post data
       const newPost = {
-        id: Date.now(),
         title: data.title,
         content: data.content,
-        excerpt: data.content.substring(0, 150) + '...',
-        coverImage,
-        tags,
-        author: user,
-        likes: 0,
-        liked: false,
-        createdAt: new Date(),
-        readTime: Math.max(1, Math.ceil(data.content.split(' ').length / 200)), // Rough estimate
+        tags: tags.filter(tag => tag.trim() !== ''), // Remove any empty tags
+        coverImage: coverImage, // The Cloudinary URL from image upload
       };
 
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-      addPost(newPost);
-      navigate('/');
+      // Get token from localStorage
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('You must be logged in to create a post');
+      }
+
+      console.log('Submitting post with image:', newPost);
+
+      // Save to database
+      const response = await fetch('http://localhost:5000/api/posts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(newPost),
+        credentials: 'include'
+      });
+
+      const responseData = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(responseData.message || `Failed to save post: ${response.statusText}`);
+      }
+
+      console.log('Post saved successfully:', responseData);
+
+      // Update frontend state with the complete post data from the server
+      // addPost({
+      //   ...responseData,
+      //   // Ensure we have all required fields for the PostCard
+      //   author: {
+      //     ...responseData.author,
+      //     name: responseData.author?.username || 'Anonymous',
+      //     avatar: responseData.author?.avatar || `https://ui-avatars.com/api/?name=${responseData.author?.username || 'User'}&background=random`
+      //   },
+      //   likes: responseData.likes || [],
+      //   liked: responseData.likes?.includes(responseData.author?._id) || false
+      // });
+
+
+      addPost({
+  ...responseData,
+  coverImage: responseData.coverImage, // make sure Cloudinary URL is kept
+  author: {
+    ...responseData.author,
+    name: responseData.author?.username || 'Anonymous',
+    avatar: responseData.author?.avatar // don’t force mock image here
+  },
+  likes: responseData.likes || [],
+  liked: responseData.likes?.includes(user?._id) || false
+});
+
+
+      // Clear the form
+      reset();
+      setTags([]);
+      setCoverImage('');
+
+      // Close the modal and redirect to the new post
+      setShowPublishModal(false);
+      navigate(`/post/${responseData._id}`);
     } catch (error) {
       console.error('Failed to create post:', error);
-    } finally {
-      setSaving(false);
-    }
-  };
+      
+      // Handle token expiration or invalid token
+      if (error.message.includes('jwt expired') || 
+          error.message.includes('invalid token') || 
+          error.message.includes('Token is not valid')) {
+        // Clear invalid token and user data
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+        
+        // Show appropriate message and redirect to login
+        alert('Your session has expired. Please log in again.');
+        navigate('/login', { state: { from: '/create-post', message: 'Session expired. Please log in again.' } });
+      } else {
+        // For other errors, show the error message
+        alert(error.message || 'Failed to create post. Please try again.');
+      }
+  } finally {
+    setSaving(false);
+  }
+};
 
   const saveDraft = async () => {
     const formData = getValues();

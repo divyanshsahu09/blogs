@@ -12,9 +12,16 @@ export const createPost = [
     }
 
     try {
+      const { title, content, tags = [], coverImage = '' } = req.body;
+      
       const newPost = new Post({
-        ...req.body,
+        title,
+        content,
+        tags,
+        coverImage,
         author: req.userId,
+        likes: [],
+        likesCount: 0
       });
       const savedPost = await newPost.save();
       res.status(201).json(savedPost);
@@ -96,3 +103,42 @@ export const getUserPosts = async (req, res, next) => {
     next(err);
   }
 };
+
+export const likePost = async (req, res, next) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) return next(createError(404, "Post not found!"));
+    
+    if (!post.likes.includes(req.userId)) {
+      await Post.findByIdAndUpdate(req.params.id, {
+        $push: { likes: req.userId },
+        $inc: { likesCount: 1 }
+      });
+      res.status(200).json({ message: "Post has been liked." });
+    } else {
+      return next(createError(400, "You have already liked this post!"));
+    }
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const unlikePost = async (req, res, next) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) return next(createError(404, "Post not found!"));
+    
+    if (post.likes.includes(req.userId)) {
+      await Post.findByIdAndUpdate(req.params.id, {
+        $pull: { likes: req.userId },
+        $inc: { likesCount: -1 }
+      });
+      res.status(200).json({ message: "Post has been unliked." });
+    } else {
+      return next(createError(400, "You have not liked this post!"));
+    }
+  } catch (err) {
+    next(err);
+  }
+};
+  

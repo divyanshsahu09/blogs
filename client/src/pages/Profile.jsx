@@ -36,9 +36,9 @@ const Profile = () => {
   const isOwnProfile = isAuthenticated && user?.id === profileUser.id;
 
   const tabs = [
-    { id: 'posts', label: 'Posts', count: userPosts.length },
-    { id: 'liked', label: 'Liked', count: 0 },
-    { id: 'drafts', label: 'Drafts', count: 0, private: true },
+    { id: 'posts', label: 'Posts', count: userPosts.length, key: 'tab-posts' },
+    { id: 'liked', label: 'Liked', count: 0, key: 'tab-liked' },
+    { id: 'drafts', label: 'Drafts', count: 0, private: true, key: 'tab-drafts' },
   ];
 
   if (loading) {
@@ -130,22 +130,22 @@ const Profile = () => {
                 )}
                 <div className="flex items-center space-x-1">
                   <Calendar size={14} />
-                  <span>Joined {profileUser.joinedAt.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
+                  <span>Joined {profileUser.joinedAt ? new Date(profileUser.joinedAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'recently'}</span>
                 </div>
               </div>
 
               {/* Stats */}
               <div className="flex items-center justify-center md:justify-start space-x-6">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-white">{profileUser.stats.posts}</div>
+                  <div className="text-2xl font-bold text-white">{profileUser.stats?.posts || 0}</div>
                   <div className="text-blue-200 text-sm">Posts</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-white">{profileUser.stats.followers.toLocaleString()}</div>
+                  <div className="text-2xl font-bold text-white">{(profileUser.stats?.followers || 0).toLocaleString()}</div>
                   <div className="text-blue-200 text-sm">Followers</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-white">{profileUser.stats.following}</div>
+                  <div className="text-2xl font-bold text-white">{profileUser.stats?.following || 0}</div>
                   <div className="text-blue-200 text-sm">Following</div>
                 </div>
               </div>
@@ -163,20 +163,26 @@ const Profile = () => {
               if (tab.private && !isOwnProfile) return null;
               
               return (
-                <button
+                <motion.div
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
-                    activeTab === tab.id
-                      ? 'border-primary-500 text-primary-400'
-                      : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
-                  }`}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3 }}
                 >
-                  <span>{tab.label}</span>
-                  <span className="bg-gray-800 text-gray-300 px-2 py-1 rounded-full text-xs">
-                    {tab.count}
-                  </span>
-                </button>
+                  <button
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
+                      activeTab === tab.id
+                        ? 'border-primary-500 text-primary-400'
+                        : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                    }`}
+                  >
+                    <span>{tab.label}</span>
+                    <span className="bg-gray-800 text-gray-300 px-2 py-1 rounded-full text-xs">
+                      {tab.count}
+                    </span>
+                  </button>
+                </motion.div>
               );
             })}
           </nav>

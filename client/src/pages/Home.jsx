@@ -7,7 +7,7 @@ import PostCard from '../components/Blog/PostCard';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
 
 const Home = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { posts, loading, deletePost } = usePosts();
 
   const trendingTags = [
@@ -114,16 +114,40 @@ const Home = () => {
 
             {/* Posts Grid */}
             <div className="space-y-6">
-              {posts.map((post, index) => (
-                <motion.div
-                  key={post.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: index * 0.1 }}
-                >
-                  <PostCard post={post} onDelete={deletePost} />
-                </motion.div>
-              ))}
+              {posts.map((post, index) => {
+                // Format the post data to match what PostCard expects
+               const formattedPost = {
+  ...post,
+  id: post._id,
+  excerpt: post.content?.substring(0, 150) + '...',
+  author: {
+    ...post.author,
+    name: post.author?.username || 'Anonymous',
+    avatar: post.author?.avatar || `https://ui-avatars.com/api/?name=${post.author?.username || 'User'}&background=random`
+  },
+  tags: post.tags || [],
+  likes: post.likes || [], // Pass the entire likes array
+  likesCount: post.likesCount || 0, // Pass the likes count separately
+  liked: user ? (post.likes?.includes(user._id) || false) : false,
+  readTime: Math.ceil((post.content?.length || 0) / 200) || 1,
+  coverImage: post.coverImage // ✅ only use what comes from backend
+};
+
+
+                return (
+                  <motion.div
+                    key={post._id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: index * 0.1 }}
+                  >
+                    <PostCard 
+                      post={formattedPost}
+                      onDelete={deletePost}
+                    />
+                  </motion.div>
+                );
+              })}
             </div>
 
             {posts.length === 0 && (
